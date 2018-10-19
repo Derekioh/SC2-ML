@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Bank version="1">
+    <Section name="Data">
+        <Key name="Kills">
+            <Value int="624"/>
+        </Key>
+        <Key name="Experience">
+            <Value int="11000"/>
+        </Key>
+        <Key name="Income">
+            <Value int="93"/>
+        </Key>
+        <Key name="Waves">
+            <Value int="12"/>
+        </Key>
+        <Key name="Lighting">
+            <Value int="0"/>
+        </Key>
+        <Key name="Leaks">
+            <Value int="68"/>
+        </Key>
+        <Key name="Wins">
+            <Value int="0"/>
+        </Key>
+        <Key name="Games">
+            <Value int="2"/>
+        </Key>
+        <Key name="Version">
+            <Value int="4"/>
+        </Key>
+        <Key name="Grid">
+            <Value flag="0"/>
+        </Key>
+        <Key name="Rating">
+            <Value int="1000"/>
+        </Key>
+        <Key name="Minutes">
+            <Value int="20"/>
+        </Key>
+        <Key name="RatedGames">
+            <Value int="0"/>
+        </Key>
+        <Key name="Prestige">
+            <Value int="0"/>
+        </Key>
+        <Key name="Creep">
+            <Value int="0"/>
+        </Key>
+    </Section>
+    <Section name="Preferences">
+        <Key name="Builder">
+            <Value int="2"/>
+        </Key>
+        <Key name="Switches">
+            <Value string="0 0 0 0 "/>
+        </Key>
+    </Section>
+    <Signature value="F28D65F191366139098F3ABAA32FCE8530F0884D"/>
+</Bank>

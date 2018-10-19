@@ -1,0 +1,10 @@
+AdditionalTeamColor=true
+gametooltips=true
+hotkeyprofile=Derek
+jointransientchannels=false
+mastervolume=0.116052
+music=true
+observerinterface=WCS_3.0.SC2Interface
+PreferredGameSite=
+replayinterface=WCS_3.0.SC2Interface
+warChestLastSeenXP=1267278
