@@ -1,9 +1,26 @@
 import win32gui
 import win32ui
 from ctypes import windll
-import Image
+from PIL import Image
 
-hwnd = win32gui.FindWindow(None, 'Calculator')
+def WindowExists(windowname):
+    try:
+        win32ui.FindWindow(None, windowname)
+
+    except win32ui.error:
+        return False
+    else:
+        return True
+
+#PROGRAM = "MATLAB R2018b - prerelease use"
+PROGRAM = "Starcraft II"
+
+if not(WindowExists(PROGRAM)):
+	print("The program '" + PROGRAM + "' does not exist.")
+	exit()
+
+
+hwnd = win32gui.FindWindow(None, PROGRAM)
 
 # Change the line below depending on whether you want the whole window
 # or just the client area. 
@@ -27,19 +44,19 @@ saveDC.SelectObject(saveBitMap)
 result = windll.user32.PrintWindow(hwnd, saveDC.GetSafeHdc(), 0)
 print(result)
 
-bmpinfo = saveBitMap.GetInfo()
-bmpstr = saveBitMap.GetBitmapBits(True)
+if result == 1:
+	#PrintWindow Succeeded
+	bmpinfo = saveBitMap.GetInfo()
+	bmpstr = saveBitMap.GetBitmapBits(True)
 
-im = Image.frombuffer(
-    'RGB',
-    (bmpinfo['bmWidth'], bmpinfo['bmHeight']),
-    bmpstr, 'raw', 'BGRX', 0, 1)
+	im = Image.frombuffer(
+	    'RGB',
+	    (bmpinfo['bmWidth'], bmpinfo['bmHeight']),
+	    bmpstr, 'raw', 'BGRX', 0, 1)   
+
+	im.save("test.png")
 
 win32gui.DeleteObject(saveBitMap.GetHandle())
 saveDC.DeleteDC()
 mfcDC.DeleteDC()
-win32gui.ReleaseDC(hwnd, hwndDC)
-
-if result == 1:
-    #PrintWindow Succeeded
-    im.save("test.png")
+win32gui.ReleaseDC(hwnd, hwndDC) 
