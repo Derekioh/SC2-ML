@@ -1,0 +1,1 @@
+python ./pysc2/bin/replay_actions.py --replays "C:/Users/dtlafever/Documents/GitHub/SC2-ML/WCS_Valencia_2018/2018 WCS Valencia/Day 1 - RO80/Group Stage 1/Group A/Neeb vs. Okaneby" 
