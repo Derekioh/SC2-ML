@@ -13,7 +13,7 @@ def WindowExists(windowname):
         return True
 
 #PROGRAM = "MATLAB R2018b - prerelease use"
-PROGRAM = "Starcraft II"
+PROGRAM = "Starcraft Viewer"
 
 if not(WindowExists(PROGRAM)):
 	print("The program '" + PROGRAM + "' does not exist.")

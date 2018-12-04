@@ -35,6 +35,7 @@ import six
 from pysc2 import run_configs
 from pysc2.lib import features
 from pysc2.lib import point
+from pysc2.lib import point_flag
 from pysc2.lib import protocol
 from pysc2.lib import remote_controller
 
@@ -42,10 +43,31 @@ from pysc2.lib import gfile
 from s2clientprotocol import common_pb2 as sc_common
 from s2clientprotocol import sc2api_pb2 as sc_pb
 
+
+from pysc2.lib import actions
+
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("parallel", 1, "How many instances to run in parallel.")
 flags.DEFINE_integer("step_mul", 8, "How many game steps per observation.")
 flags.DEFINE_string("replays", None, "Path to a directory of replays.")
+
+point_flag.DEFINE_point("rgb_screen_size", "256,192",
+                        "Resolution for rendered screen.")
+point_flag.DEFINE_point("feature_screen_size", "84",
+                        "Resolution for screen feature layers.")
+
+point_flag.DEFINE_point("rgb_minimap_size", "128",
+                        "Resolution for rendered minimap.")
+point_flag.DEFINE_point("feature_minimap_size", "64",
+                        "Resolution for minimap feature layers.")
+
+# class ActionSpace(enum.Enum):
+#   FEATURES = 1
+#   RGB = 2
+flags.DEFINE_integer("action_space", 1,  # pylint: disable=protected-access
+                  "Which action space to use. Needed if you take both feature "
+                  "and rgb observations.")
+
 flags.mark_flag_as_required("replays")
 
 FLAGS(sys.argv)
@@ -58,6 +80,14 @@ interface = sc_pb.InterfaceOptions(
 size.assign_to(interface.feature_layer.resolution)
 size.assign_to(interface.feature_layer.minimap_resolution)
 
+
+# FLAGS.feature_screen_size.assign_to(interface.feature_layer.resolution)
+# FLAGS.feature_minimap_size.assign_to(
+#     interface.feature_layer.minimap_resolution)
+# FLAGS.rgb_screen_size.assign_to(interface.render.resolution)
+# FLAGS.rgb_minimap_size.assign_to(interface.render.minimap_resolution)
+
+#FLAGS.action_space.assign_to(interface.render.action_space)
 
 def sorted_dict_str(d):
   return "{%s}" % ", ".join("%s: %s" % (k, d[k])
@@ -274,7 +304,27 @@ class ReplayProcessor(multiprocessing.Process):
         options=interface,
         observed_player_id=player_id))
 
+    #TODO: Figure out how to properly use enums for this library
+    # if FLAGS.action_space == 1:
+    #   action_space = actions.ActionSpace.FEATURES
+    # else:
+    #   action_space = actions.ActionSpace.RGB
+
     feat = features.features_from_game_info(controller.game_info())
+#     feat = features.Features(
+#         features.AgentInterfaceFormat(
+#             feature_dimensions=features.Dimensions(
+#                 screen=FLAGS.feature_screen_size, minimap=FLAGS.feature_minimap_size),
+# #                screen=(64, 60), minimap=(32, 28)),
+#             rgb_dimensions=features.Dimensions(
+#                 screen=FLAGS.rgb_screen_size, minimap=FLAGS.rgb_minimap_size),
+# #                screen=(128, 124), minimap=(64, 60)),
+#             action_space=action_space,
+#             use_feature_units=True
+#         ),
+#         map_size=point.Point(256, 256)
+#     )
+
 
     self.stats.replay_stats.replays += 1
     self._update_stage("step")
