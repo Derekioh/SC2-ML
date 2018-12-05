@@ -25,6 +25,8 @@ import signal
 import sys
 import threading
 import time
+from PIL import ImageGrab
+import win32gui
 
 from absl import app
 from absl import flags
@@ -223,17 +225,19 @@ def valid_replay(info, ping):
 class ReplayProcessor(multiprocessing.Process):
   """A Process that pulls replays and processes them."""
 
-  def __init__(self, proc_id, run_config, replay_queue, stats_queue):
+  def __init__(self, proc_id, run_config, replay_queue, stats_queue, dataFileName):
     super(ReplayProcessor, self).__init__()
     self.stats = ProcessStats(proc_id)
     self.run_config = run_config
     self.replay_queue = replay_queue
     self.stats_queue = stats_queue
+    self.dataFileName = dataFileName
 
   def run(self):
     signal.signal(signal.SIGTERM, lambda a, b: sys.exit())  # Exit quietly.
     self._update_stage("spawn")
     replay_name = "none"
+    gameNUM = 0
     while True:
       self._print("Starting up a new SC2 instance.")
       self._update_stage("launch")
@@ -258,6 +262,16 @@ class ReplayProcessor(multiprocessing.Process):
               info = controller.replay_info(replay_data)
               self._print((" Replay Info %s " % replay_name).center(60, "-"))
               self._print(info)
+
+              # WRITE TO DATA FILE
+              gameNUM = gameNUM + 1
+              dataFile = open(self.dataFileName,'a')
+              dataFile.write("GAME," + str(gameNUM) + "\n")
+              dataFile.write(str(info.player_info[0].player_info.player_id) + "," + str(info.player_info[0].player_info.race_actual) + "," + str(info.player_info[0].player_apm) + "," + str(info.player_info[0].player_result.result) + "\n")
+              dataFile.write(str(info.player_info[1].player_info.player_id) + "," + str(info.player_info[1].player_info.race_actual) + "," + str(info.player_info[1].player_apm) + "," + str(info.player_info[1].player_result.result) + "\n")
+              dataFile.write(str(info.map_name) + "," + str(info.game_duration_loops)  + "," + str(info.game_duration_seconds) + "\n")
+              dataFile.close()
+
               self._print("-" * 60)
               if valid_replay(info, ping):
                 self.stats.replay_stats.maps[info.map_name] += 1
@@ -273,7 +287,7 @@ class ReplayProcessor(multiprocessing.Process):
                   self._print("Starting %s from player %s's perspective" % (
                       replay_name, player_id))
                   self.process_replay(controller, replay_data, map_data,
-                                      player_id)
+                                      player_id, self.dataFileName)
               else:
                 self._print("Replay is invalid.")
                 self.stats.replay_stats.invalid_replays.add(replay_name)
@@ -295,8 +309,9 @@ class ReplayProcessor(multiprocessing.Process):
     self.stats.update(stage)
     self.stats_queue.put(self.stats)
 
-  def process_replay(self, controller, replay_data, map_data, player_id):
+  def process_replay(self, controller, replay_data, map_data, player_id, dataFileName):
     """Process a single replay, updating the stats."""
+    self.stats.replay_stats.replays = 0
     self._update_stage("start_replay")
     controller.start_replay(sc_pb.RequestStartReplay(
         replay_data=replay_data,
@@ -332,6 +347,7 @@ class ReplayProcessor(multiprocessing.Process):
     while True:
       self.stats.replay_stats.steps += 1
       self._update_stage("observe")
+
       obs = controller.observe()
 
       for action in obs.actions:
@@ -366,11 +382,43 @@ class ReplayProcessor(multiprocessing.Process):
       if obs.player_result:
         break
 
+      if self.stats.replay_stats.steps % 110 == 0: #every 5 seconds~
+        dataFile = open(dataFileName,'a')
+        imageName = str(self.stats.replay_stats.replays) + "_" + str(self.stats.replay_stats.steps) + ".png"
+
+        def enum_cb(hwnd, results):
+          winlist.append((hwnd, win32gui.GetWindowText(hwnd)))
+        try:
+          toplist, winlist = [], []
+          win32gui.EnumWindows(enum_cb, toplist)
+
+          starcraft2Client = [(hwnd, title) for hwnd, title in winlist if 'starcraft ii' in title.lower()]
+          # just grab the hwnd for first window matching starcraft2Client
+          if len(starcraft2Client) == 0:
+            print("[ERROR] Starcraft 2 Client Not Running.")
+            dataFile.write("ERROR" + imageName + "\n")
+          else:
+            starcraft2Client = starcraft2Client[0]
+            hwnd = starcraft2Client[0]
+
+            win32gui.SetForegroundWindow(hwnd)
+            #time.sleep(.1)
+            bbox = win32gui.GetWindowRect(hwnd)
+            bbox = (6,913,250,1160)
+            img = ImageGrab.grab(bbox)
+            img.save("images/"+imageName)
+
+            dataFile.write(imageName + "\n")
+            dataFile.close()
+        except:
+          dataFile.write("ERROR" + imageName + "\n")
+          dataFile.close()
+
       self._update_stage("step")
       controller.step(FLAGS.step_mul)
 
 
-def stats_printer(stats_queue):
+def stats_printer(stats_queue, dataFileName):
   """A thread that consumes stats_queue and prints them every 10 seconds."""
   proc_stats = [ProcessStats(i) for i in range(FLAGS.parallel)]
   print_time = start_time = time.time()
@@ -378,7 +426,7 @@ def stats_printer(stats_queue):
 
   running = True
   while running:
-    print_time += 10
+    print_time += 1
 
     while time.time() < print_time:
       try:
@@ -394,11 +442,11 @@ def stats_printer(stats_queue):
     for s in proc_stats:
       replay_stats.merge(s.replay_stats)
 
-    print((" Summary %0d secs " % (print_time - start_time)).center(width, "="))
-    print(replay_stats)
-    print(" Process stats ".center(width, "-"))
-    print("\n".join(str(s) for s in proc_stats))
-    print("=" * width)
+    # print((" Summary %0d secs " % (print_time - start_time)).center(width, "="))
+    # print(replay_stats)
+    # print(" Process stats ".center(width, "-"))
+    # print("\n".join(str(s) for s in proc_stats))
+    # print("=" * width)
 
 
 def replay_queue_filler(replay_queue, replay_list):
@@ -414,8 +462,11 @@ def main(unused_argv):
   if not gfile.Exists(FLAGS.replays):
     sys.exit("{} doesn't exist.".format(FLAGS.replays))
 
+  #dataFile = open('data.txt','a')
+  dataFileName = "data.txt"
+
   stats_queue = multiprocessing.Queue()
-  stats_thread = threading.Thread(target=stats_printer, args=(stats_queue,))
+  stats_thread = threading.Thread(target=stats_printer, args=(stats_queue,dataFileName,))
   stats_thread.start()
   try:
     # For some reason buffering everything into a JoinableQueue makes the
@@ -433,7 +484,7 @@ def main(unused_argv):
     replay_queue_thread.start()
 
     for i in range(FLAGS.parallel):
-      p = ReplayProcessor(i, run_config, replay_queue, stats_queue)
+      p = ReplayProcessor(i, run_config, replay_queue, stats_queue, dataFileName)
       p.daemon = True
       p.start()
       time.sleep(1)  # Stagger startups, otherwise they seem to conflict somehow
@@ -444,6 +495,7 @@ def main(unused_argv):
   finally:
     stats_queue.put(None)  # Tell the stats_thread to print and exit.
     stats_thread.join()
+
 
 
 if __name__ == "__main__":
