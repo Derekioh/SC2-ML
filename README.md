@@ -24,9 +24,13 @@ Loss = 2
 Example Game:
 
 GAME,0
-1,3,286,1              #player id, player race, palyer apm, win/loss
-2,1,383,2              #player id, player race, palyer apm, win/loss
-9320,416.1004638671875 #time steps, time in seconds of whole game
+1,3,286,1                  #player id, player race, palyer apm, win/loss
+2,1,383,2                  #player id, player race, palyer apm, win/loss
+map,9320,416.1004638671875 #map, time steps, time in seconds of whole game
+
+outcome
+Player 1 Win = 1
+Player 2 Win = 2
 
 
 STEPS TO GET JUPYTER WORKING

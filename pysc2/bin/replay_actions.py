@@ -265,11 +265,19 @@ class ReplayProcessor(multiprocessing.Process):
 
               # WRITE TO DATA FILE
               gameNUM = gameNUM + 1
+              totalTime = info.game_duration_seconds
+              if info.player_info[0].player_result.result == 2:
+                outcome = 1
+              else:
+                outcome = 2
               dataFile = open(self.dataFileName,'a')
-              dataFile.write("GAME," + str(gameNUM) + "\n")
-              dataFile.write(str(info.player_info[0].player_info.player_id) + "," + str(info.player_info[0].player_info.race_actual) + "," + str(info.player_info[0].player_apm) + "," + str(info.player_info[0].player_result.result) + "\n")
-              dataFile.write(str(info.player_info[1].player_info.player_id) + "," + str(info.player_info[1].player_info.race_actual) + "," + str(info.player_info[1].player_apm) + "," + str(info.player_info[1].player_result.result) + "\n")
-              dataFile.write(str(info.map_name) + "," + str(info.game_duration_loops)  + "," + str(info.game_duration_seconds) + "\n")
+              dataFile.write("GAME," + str(gameNUM) + ","
+                            + str(info.player_info[0].player_info.race_actual) + "," + str(info.player_info[0].player_apm) + ","
+                            + str(info.player_info[1].player_info.race_actual) + "," + str(info.player_info[1].player_apm) + ","
+                            + str(info.map_name) + "," + str(totalTime) + "," + str(outcome) + "\n")
+              # dataFile.write(str(info.player_info[0].player_info.player_id) + "," + str(info.player_info[0].player_info.race_actual) + "," + str(info.player_info[0].player_apm) + "," + str(info.player_info[0].player_result.result) + "\n")
+              # dataFile.write(str(info.player_info[1].player_info.player_id) + "," + str(info.player_info[1].player_info.race_actual) + "," + str(info.player_info[1].player_apm) + "," + str(info.player_info[1].player_result.result) + "\n")
+              # dataFile.write(str(info.map_name) + "," + str(info.game_duration_loops)  + "," + str(totalTime) + "\n")
               dataFile.close()
 
               self._print("-" * 60)
@@ -283,11 +291,12 @@ class ReplayProcessor(multiprocessing.Process):
                 if info.local_map_path:
                   self._update_stage("open map file")
                   map_data = self.run_config.map_data(info.local_map_path)
-                for player_id in [1, 2]:
+                #for player_id in [1, 2]:
+                for player_id in [1]:
                   self._print("Starting %s from player %s's perspective" % (
                       replay_name, player_id))
                   self.process_replay(controller, replay_data, map_data,
-                                      player_id, self.dataFileName)
+                                      player_id, self.dataFileName, totalTime, gameNUM)
               else:
                 self._print("Replay is invalid.")
                 self.stats.replay_stats.invalid_replays.add(replay_name)
@@ -309,7 +318,7 @@ class ReplayProcessor(multiprocessing.Process):
     self.stats.update(stage)
     self.stats_queue.put(self.stats)
 
-  def process_replay(self, controller, replay_data, map_data, player_id, dataFileName):
+  def process_replay(self, controller, replay_data, map_data, player_id, dataFileName, totalTime, gameNUM):
     """Process a single replay, updating the stats."""
     self.stats.replay_stats.replays = 0
     self._update_stage("start_replay")
@@ -317,7 +326,8 @@ class ReplayProcessor(multiprocessing.Process):
         replay_data=replay_data,
         map_data=map_data,
         options=interface,
-        observed_player_id=player_id))
+        observed_player_id=player_id,
+        disable_fog=True))
 
     #TODO: Figure out how to properly use enums for this library
     # if FLAGS.action_space == 1:
@@ -344,6 +354,7 @@ class ReplayProcessor(multiprocessing.Process):
     self.stats.replay_stats.replays += 1
     self._update_stage("step")
     controller.step()
+    obsIntervals = [] #created since sometimes obs are on the same time step (ex. multiple game steps at 5 seconds)
     while True:
       self.stats.replay_stats.steps += 1
       self._update_stage("observe")
@@ -382,9 +393,15 @@ class ReplayProcessor(multiprocessing.Process):
       if obs.player_result:
         break
 
-      if self.stats.replay_stats.steps % 110 == 0: #every 5 seconds~
+      sec = obs.observation.game_loop // 22.4  # http://liquipedia.net/starcraft2/Game_Speed
+
+      #if self.stats.replay_stats.steps % 110 == 0: #every 5 seconds~
+      if sec % 5 == 0 and sec not in obsIntervals: #every 5 seconds
+        obsIntervals.append(sec)
+        #print("Time: " + str(sec) + "/" + str(totalTime))
+
         dataFile = open(dataFileName,'a')
-        imageName = str(self.stats.replay_stats.replays) + "_" + str(self.stats.replay_stats.steps) + ".png"
+        imageName = str(gameNUM) + "_" + str(player_id) + "_" + str(int(sec)) + ".png"
 
         def enum_cb(hwnd, results):
           winlist.append((hwnd, win32gui.GetWindowText(hwnd)))
@@ -396,7 +413,7 @@ class ReplayProcessor(multiprocessing.Process):
           # just grab the hwnd for first window matching starcraft2Client
           if len(starcraft2Client) == 0:
             print("[ERROR] Starcraft 2 Client Not Running.")
-            dataFile.write("ERROR" + imageName + "\n")
+            dataFile.write(str(gameNUM) + "," + str(player_id) + "," + str(int(sec)) + "," + "ERROR\n")
           else:
             starcraft2Client = starcraft2Client[0]
             hwnd = starcraft2Client[0]
@@ -406,12 +423,12 @@ class ReplayProcessor(multiprocessing.Process):
             bbox = win32gui.GetWindowRect(hwnd)
             bbox = (6,913,250,1160)
             img = ImageGrab.grab(bbox)
-            img.save("images/"+imageName)
+            img.save("FullVisionImages/"+imageName)
 
-            dataFile.write(imageName + "\n")
+            dataFile.write(str(gameNUM) + "," + str(player_id) + "," + str(int(sec)) + "," + imageName + "\n")
             dataFile.close()
         except:
-          dataFile.write("ERROR" + imageName + "\n")
+          dataFile.write(str(gameNUM) + "," + str(player_id) + "," + str(int(sec)) + "," + "ERROR\n")
           dataFile.close()
 
       self._update_stage("step")
@@ -463,7 +480,7 @@ def main(unused_argv):
     sys.exit("{} doesn't exist.".format(FLAGS.replays))
 
   #dataFile = open('data.txt','a')
-  dataFileName = "data.txt"
+  dataFileName = "dataFullVision.txt"
 
   stats_queue = multiprocessing.Queue()
   stats_thread = threading.Thread(target=stats_printer, args=(stats_queue,dataFileName,))

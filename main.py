@@ -1,62 +1,131 @@
-import win32gui
-import win32ui
-from ctypes import windll
-from PIL import Image
+##########################################
+#       RESIZE IMAGES WITH PADDING       #
+##########################################
 
-def WindowExists(windowname):
-    try:
-        win32ui.FindWindow(None, windowname)
+# RESIZE IMAGES WITH PADDING
+from PIL import Image, ImageOps
 
-    except win32ui.error:
-        return False
-    else:
-        return True
+from os import listdir
+from os.path import isfile, join
+from shutil import rmtree
 
-#PROGRAM = "MATLAB R2018b - prerelease use"
-PROGRAM = "Starcraft Viewer"
+print("Resizing images to be the correct size with padding...")
 
-if not(WindowExists(PROGRAM)):
-	print("The program '" + PROGRAM + "' does not exist.")
-	exit()
+desiredImageSize = 256
+prePaddedImageFilePath = "FullVisionImages/"
+paddedImageFilePath = "resizedFullVisionImages/"
 
+if not(os.path.isdir(paddedImageFilePath)):
+	os.mkdir(paddedImageFilePath)
+else:
+	#delete files and create new ones
+	shutil.rmtree(paddedImageFilePath)
+	os.mkdir(paddedImageFilePath)
 
-hwnd = win32gui.FindWindow(None, PROGRAM)
+imageFilesPrePadding = [f for f in listdir(prePaddedImageFilePath.strip('/')) if isfile(join(prePaddedImageFilePath.strip('/'), f))]
 
-# Change the line below depending on whether you want the whole window
-# or just the client area. 
-#left, top, right, bot = win32gui.GetClientRect(hwnd)
-left, top, right, bot = win32gui.GetWindowRect(hwnd)
-w = right - left
-h = bot - top
+for file in imageFilesPrePadding:
 
-hwndDC = win32gui.GetWindowDC(hwnd)
-mfcDC  = win32ui.CreateDCFromHandle(hwndDC)
-saveDC = mfcDC.CreateCompatibleDC()
+	im = Image.open(prePaddedImageFilePath+file)
+	old_size = im.size  # old_size[0] is in (width, height) format
 
-saveBitMap = win32ui.CreateBitmap()
-saveBitMap.CreateCompatibleBitmap(mfcDC, w, h)
+	ratio = float(desiredImageSize)/max(old_size)
+	new_size = tuple([int(x*ratio) for x in old_size])
+	# use thumbnail() or resize() method to resize the input image
 
-saveDC.SelectObject(saveBitMap)
+	# thumbnail is a in-place operation
 
-# Change the line below depending on whether you want the whole window
-# or just the client area. 
-#result = windll.user32.PrintWindow(hwnd, saveDC.GetSafeHdc(), 1)
-result = windll.user32.PrintWindow(hwnd, saveDC.GetSafeHdc(), 0)
-print(result)
+	# im.thumbnail(new_size, Image.ANTIALIAS)
+	im = im.resize(new_size, Image.ANTIALIAS)
 
-if result == 1:
-	#PrintWindow Succeeded
-	bmpinfo = saveBitMap.GetInfo()
-	bmpstr = saveBitMap.GetBitmapBits(True)
+	# create a new image and paste the resized on it
+	new_im = Image.new("RGB", (desiredImageSize, desiredImageSize))
+	new_im.paste(im, ((desiredImageSize-new_size[0])//2,
+	                    (desiredImageSize-new_size[1])//2))
 
-	im = Image.frombuffer(
-	    'RGB',
-	    (bmpinfo['bmWidth'], bmpinfo['bmHeight']),
-	    bmpstr, 'raw', 'BGRX', 0, 1)   
+	#new_im.show()
+	new_im.save(paddedImageFilePath+file)
 
-	im.save("test.png")
+print("Resizing complete.")
 
-win32gui.DeleteObject(saveBitMap.GetHandle())
-saveDC.DeleteDC()
-mfcDC.DeleteDC()
-win32gui.ReleaseDC(hwnd, hwndDC) 
+##########################################
+#       PARSE DATA AND CREATE A CSV      #
+##########################################
+
+import math
+
+print("Parsing data file and creating a CSV from it...")
+
+dataFilename = "dataFullVision.txt"
+datasetFilename = "datasetFullVision.csv"
+
+dataFile = open(dataFilename,'r')
+datasetFile = open(datasetFilename,'w')
+
+#write header for the csv file
+datasetFile.write("file,current_time,race0,apm0,race1,apm1,map,total_time,outcome\n")
+
+lines = dataFile.readlines()
+dataFile.close()
+
+dataRow = []
+for line in lines:
+	splitLine = line.strip("\n").split(",")
+	if splitLine[0] == "GAME":
+		dataRow = splitLine[2:]
+	else:
+		#only write if the filename isn't ERROR
+		if splitLine[3] != "ERROR":
+			datasetFile.write(splitLine[3] + "," + splitLine[2] + ",")
+			for ele in dataRow[:-2]:
+				datasetFile.write(ele + ",")
+			datasetFile.write(str(math.floor(float(dataRow[-2]))) + ",")
+			datasetFile.write(dataRow[-1] + "\n")
+
+datasetFile.close()
+
+print("Parsing Complete.")
+
+##########################################
+#       MOVE IMAGES TO CLASS FOLDERS     #
+##########################################
+
+from os import rename
+
+imagePath = "resizedFullVisionImages/"
+classOnePath = "resizedFullVisionImages/001/"
+classTwoPath = "resizedFullVisionImages/002/"
+
+if not(os.path.isdir(classOnePath)):
+	os.mkdir(classOnePath)
+else:
+	#delete files and create new ones
+	shutil.rmtree(classOnePath)
+	os.mkdir(classOnePath)
+
+if not(os.path.isdir(classTwoPath)):
+	os.mkdir(classTwoPath)
+else:
+	#delete files and create new ones
+	shutil.rmtree(classTwoPath)
+	os.mkdir(classTwoPath)
+
+datasetFile = "datasetFullVision.csv"
+
+dataFile = open(datasetFile,"r")
+
+lines = dataFile.readlines()
+dataFile.close()
+
+for line in lines:
+	stripLine = line.strip("\n").split(",")
+	#file index 0
+	#outcome 8
+
+	if stripLine[8] == "1":
+		if os.path.isfile(imagePath + stripLine[0]):
+			os.rename(imagePath + stripLine[0], classOnePath + stripLine[0])
+	else:
+		if os.path.isfile(imagePath + stripLine[0]):
+			os.rename(imagePath + stripLine[0], classTwoPath + stripLine[0])
+

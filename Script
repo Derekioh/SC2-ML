@@ -1,5 +1,16 @@
 python ./pysc2/bin/replay_actions.py --replays "C:/Users/dtlafever/Documents/GitHub/SC2-ML/WCS_Valencia_2018/2018 WCS Valencia/Day 1 - RO80/Group Stage 1/Group A/Neeb vs. Okaneby" 
 
+python ./pysc2/bin/play.py --replay "C:/Users/dtlafever/Documents/GitHub/SC2-ML/WCS_Valencia_2018/2018 WCS Valencia/Day 1 - RO80/Group Stage 1/Group A/Neeb vs. Okaneby/Acid Plant LE (2).SC2Replay" --fps 30
+
+------------------------------------------------------------------------------------
+
 python ./pysc2/bin/replay_actions.py --replays "C:/Users/dtlafever/Documents/GitHub/SC2-ML/Games" 
 
-python ./pysc2/bin/play.py --replay "C:/Users/dtlafever/Documents/GitHub/SC2-ML/WCS_Valencia_2018/2018 WCS Valencia/Day 1 - RO80/Group Stage 1/Group A/Neeb vs. Okaneby/Acid Plant LE (2).SC2Replay" --fps 30
+python resize_pad.py
+
+python parseData.py
+
+python moveToClasses.py
+
+python grabLast.py
+
