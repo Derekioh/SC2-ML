@@ -63,14 +63,19 @@ point_flag.DEFINE_point("rgb_minimap_size", "128",
 point_flag.DEFINE_point("feature_minimap_size", "64",
                         "Resolution for minimap feature layers.")
 
+flags.DEFINE_bool("disable_fog", False,
+                  "A flag for whether or not to have fog of war and render the " +
+                   "game with both player perspectives.")
+
 # class ActionSpace(enum.Enum):
 #   FEATURES = 1
 #   RGB = 2
 flags.DEFINE_integer("action_space", 1,  # pylint: disable=protected-access
-                  "Which action space to use. Needed if you take both feature "
+                  "Which action space to use. Needed if you take both feature " +
                   "and rgb observations.")
 
 flags.mark_flag_as_required("replays")
+flags.mark_flag_as_required("disable_fog")
 
 FLAGS(sys.argv)
 
@@ -275,9 +280,6 @@ class ReplayProcessor(multiprocessing.Process):
                             + str(info.player_info[0].player_info.race_actual) + "," + str(info.player_info[0].player_apm) + ","
                             + str(info.player_info[1].player_info.race_actual) + "," + str(info.player_info[1].player_apm) + ","
                             + str(info.map_name) + "," + str(totalTime) + "," + str(outcome) + "\n")
-              # dataFile.write(str(info.player_info[0].player_info.player_id) + "," + str(info.player_info[0].player_info.race_actual) + "," + str(info.player_info[0].player_apm) + "," + str(info.player_info[0].player_result.result) + "\n")
-              # dataFile.write(str(info.player_info[1].player_info.player_id) + "," + str(info.player_info[1].player_info.race_actual) + "," + str(info.player_info[1].player_apm) + "," + str(info.player_info[1].player_result.result) + "\n")
-              # dataFile.write(str(info.map_name) + "," + str(info.game_duration_loops)  + "," + str(totalTime) + "\n")
               dataFile.close()
 
               self._print("-" * 60)
@@ -291,8 +293,12 @@ class ReplayProcessor(multiprocessing.Process):
                 if info.local_map_path:
                   self._update_stage("open map file")
                   map_data = self.run_config.map_data(info.local_map_path)
-                #for player_id in [1, 2]:
-                for player_id in [1]:
+                
+                if FLAGS.disable_fog == False:
+                  player_id_list = [1, 2]
+                else:
+                  player_id_list = [1]
+                for player_id in player_id_list:
                   self._print("Starting %s from player %s's perspective" % (
                       replay_name, player_id))
                   self.process_replay(controller, replay_data, map_data,
@@ -327,7 +333,7 @@ class ReplayProcessor(multiprocessing.Process):
         map_data=map_data,
         options=interface,
         observed_player_id=player_id,
-        disable_fog=True))
+        disable_fog=FLAGS.disable_fog))
 
     #TODO: Figure out how to properly use enums for this library
     # if FLAGS.action_space == 1:
@@ -349,6 +355,17 @@ class ReplayProcessor(multiprocessing.Process):
 #         ),
 #         map_size=point.Point(256, 256)
 #     )
+
+      self._features = features.Features(
+        features.AgentInterfaceFormat(
+            feature_dimensions=features.Dimensions(
+                screen=(64, 60), minimap=(32, 28)),
+            rgb_dimensions=features.Dimensions(
+                screen=(128, 124), minimap=(64, 60)),
+            action_space=actions.ActionSpace.FEATURES,
+            use_feature_units=True
+        ),
+        map_size=point.Point(256, 256)
 
 
     self.stats.replay_stats.replays += 1
