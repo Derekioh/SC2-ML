@@ -12,8 +12,8 @@ from shutil import rmtree
 print("Resizing images to be the correct size with padding...")
 
 desiredImageSize = 256
-prePaddedImageFilePath = "FullVisionImages/"
-paddedImageFilePath = "resizedFullVisionImages/"
+prePaddedImageFilePath = "Images/"
+paddedImageFilePath = "resizedImages/"
 
 if not(os.path.isdir(paddedImageFilePath)):
 	os.mkdir(paddedImageFilePath)
@@ -92,9 +92,9 @@ print("Parsing Complete.")
 
 from os import rename
 
-imagePath = "resizedFullVisionImages/"
-classOnePath = "resizedFullVisionImages/001/"
-classTwoPath = "resizedFullVisionImages/002/"
+imagePath = paddedImageFilePath
+classOnePath = paddedImageFilePath + "001/"
+classTwoPath = paddedImageFilePath + "002/"
 
 if not(os.path.isdir(classOnePath)):
 	os.mkdir(classOnePath)
@@ -135,9 +135,9 @@ for line in lines:
 
 from shutil import copyfile
 
-imagePath = "resizedFullVisionImages/"
-classOnePath = "resizedFullVisionImages/001/"
-classTwoPath = "resizedFullVisionImages/002/"
+imagePath = paddedImageFilePath
+classOnePath = paddedImageFilePath + "001/"
+classTwoPath = paddedImageFilePath + "002/"
 
 LastPath = "Last/"
 
