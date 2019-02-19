@@ -2,12 +2,16 @@
 
 ## About
 
-The Goal of this project was predict who would win in a game of Starcraft II. Using ResNet-18, I trained the network on map images taken throughout matches between professional players. The dataset of replays (included) is taken from the WCS Valencia 2018 tournament. My code is broken up into two main parts:
+The Goal of this project was predict who would win in a game of Starcraft II. Using ResNet-18, I trained the network on map images taken throughout matches between professional players. With this network, I achieved an accuracy of 64%. A more detailed writeup of the work can be read in the *final_paper.pdf*.
+
+The dataset of replays (included) is taken from the WCS Valencia 2018 tournament. My code is broken up into two main parts:
 
 1. Data collection and processing (Ran in Windows)
 2. training and testing
 
 As such, I will break down requirements and usage accordingly. Note that data colleciton and processing was done in windows to make use of the Starcraft II game replay feature. While there has been Starcraft II environmments that are tested in Linux, I have not personally used them.
+
+For more details on results
 
 ## Requirements
 
@@ -49,10 +53,14 @@ The flags that are important here are:
 Once this data collection is done, we can preprocess the images to be the right size for our network and will the correct labels in a CSV file:
 
 ```
-python main.py
+python Processing_main.py
 ```
 
 ### Training and Testing
 
-Once we have collected the data and created our CSV files, we can train our network. 
+Once we have collected the data and created our CSV files, we can train our network. Simply call
+
+```
+python ML_main.py
+```
 
