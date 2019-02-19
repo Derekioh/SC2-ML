@@ -1,45 +1,66 @@
-# SC2 ML
+# SC ML Project
 
-Dependencies
+## About
+
+The Goal of this project was predict who would win in a game of Starcraft II. Using ResNet-18, I trained the network on map images taken throughout matches between professional players. With this network, I achieved an accuracy of 64%. A more detailed writeup of the work can be read in the *final_paper.pdf*.
+
+The dataset of replays (included) is taken from the WCS Valencia 2018 tournament. My code is broken up into two main parts:
+
+1. Data collection and processing (Ran in Windows)
+2. training and testing
+
+As such, I will break down requirements and usage accordingly. Note that data colleciton and processing was done in windows to make use of the Starcraft II game replay feature. While there has been Starcraft II environmments that are tested in Linux, I have not personally used them.
+
+For more details on results
+
+## Requirements
+
+### Data Collection and Processing
+
+Python 3 requirements
+```
+pip install shutil
+pip install PIL
+pip install pysc2
 pip install win32gui
-pip install pywin32
-pip install Image
+```
 
-Dataset
-RACE
-----
-terran  = 1
-zerg    = 2
-protoss = 3
+Additionally, [Starcraft II](https://starcraft2.com/en-us/) will need to be downloaded and installed.
 
-GAME DURATION
--------------
-In seconds
+### Training and Testing
 
-OUTCOME
--------
-Win  = 1
-Loss = 2
+Anaconda 3.5.1
+```
+PyTorch 0.4.1
+```
 
-Example Game:
+## Usage
 
-GAME,0
-1,3,286,1                  #player id, player race, palyer apm, win/loss
-2,1,383,2                  #player id, player race, palyer apm, win/loss
-map,9320,416.1004638671875 #map, time steps, time in seconds of whole game
+### Data Collection and Processing
 
-outcome
-Player 1 Win = 1
-Player 2 Win = 2
+While the replays to the tournament are provided in this repo, you will need to generate the map images from the replays. This means running every game and taking periodic screenshots of the map image to be later fed into our network. This capture process can be done by calling this script:
 
+```
+python ./pysc2/bin/replay_actions.py --replays "./WCS_Valencia_2018/2018 WCS Valencia/Day 1 - RO80/Group Stage 1/Group A/Neeb vs. Okaneby" --disable_fog True --time_interval 5
+```
 
-STEPS TO GET JUPYTER WORKING
+The flags that are important here are:
+ - replays = the Path to a directory of replays
+ - disable_fog: whether to show replays from one player's perspective or from both
+  - NOTE: setting disable_fog to false will double the number of images as each game will be run twice (once for each player's perspective)
+ - time_interval: how many seconds to wait in between taking a screenshot.
 
-ON LILOU
-jupyter notebook --no-browser --port=8080
+Once this data collection is done, we can preprocess the images to be the right size for our network and will the correct labels in a CSV file:
 
-On LINUX Terminal on PC
-ssh -N -L 8080:localhost:8080 dtlafever@lilou.seas.gwu.edu
+```
+python Processing_main.py
+```
 
-ON LILOU
-Copy the url that is provided or go to http://localhost:8080/
+### Training and Testing
+
+Once we have collected the data and created our CSV files, we can train our network. Simply call
+
+```
+python ML_main.py
+```
+
