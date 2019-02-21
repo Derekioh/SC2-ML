@@ -1,4 +1,0 @@
-Look at strategies for a particular player
-how successful a particular strategy is overall
-how much time is left
-stats of particular races

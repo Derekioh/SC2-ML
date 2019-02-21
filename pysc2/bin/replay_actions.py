@@ -67,6 +67,8 @@ flags.DEFINE_bool("disable_fog", False,
                   "A flag for whether or not to have fog of war and render the " +
                    "game with both player perspectives.")
 
+flags.DEFINE_integer("time_interval", 5, "How many seconds to wait in between taking screenshots")
+
 # class ActionSpace(enum.Enum):
 #   FEATURES = 1
 #   RGB = 2
@@ -76,6 +78,7 @@ flags.DEFINE_integer("action_space", 1,  # pylint: disable=protected-access
 
 flags.mark_flag_as_required("replays")
 flags.mark_flag_as_required("disable_fog")
+#flags.mark_flag_as_required("time_interval")
 
 FLAGS(sys.argv)
 
@@ -413,7 +416,7 @@ class ReplayProcessor(multiprocessing.Process):
       sec = obs.observation.game_loop // 22.4  # http://liquipedia.net/starcraft2/Game_Speed
 
       #if self.stats.replay_stats.steps % 110 == 0: #every 5 seconds~
-      if sec % 5 == 0 and sec not in obsIntervals: #every 5 seconds
+      if sec % FLAGS.time_interval == 0 and sec not in obsIntervals: #every 5 seconds
         obsIntervals.append(sec)
         #print("Time: " + str(sec) + "/" + str(totalTime))
 
@@ -440,7 +443,7 @@ class ReplayProcessor(multiprocessing.Process):
             bbox = win32gui.GetWindowRect(hwnd)
             bbox = (6,913,250,1160)
             img = ImageGrab.grab(bbox)
-            img.save("FullVisionImages/"+imageName)
+            img.save("Images/"+imageName)
 
             dataFile.write(str(gameNUM) + "," + str(player_id) + "," + str(int(sec)) + "," + imageName + "\n")
             dataFile.close()
