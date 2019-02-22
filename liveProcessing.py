@@ -4,17 +4,20 @@ from PIL import Image
 import requests
 from io import BytesIO
 import time
+#import twitch
+import livestreamer
+import cv2
 
 ##################################
 
-streamName  = "kimdaeyeob3"
+streamName  = "lamboking"
 imageWidth  = 1920
 imageHeight = 1080
 URL         = "https://static-cdn.jtvnw.net/previews-ttv/live_user_" + streamName + "-" + str(imageWidth) + "x" + str(imageHeight) + ".jpg"
 streamImageBox = (27, 807, 287, 1066)
 
 imageResize = 256
-destinationFolder = "StreamImages/kimdaeyeob3/"
+destinationFolder = "StreamImages/" + streamName + "/"
 
 #TODO: check files for images to prevent creating duplicates
 
@@ -41,21 +44,48 @@ def createPaddedImage(im, desiredImageSize):
 
 ##################################
 
+print("Preview Stream URL")
 print(URL)
 
 i = 0
-while True:
+while i < 1:
 
-	response = requests.get(URL)
-	streamImage = Image.open(BytesIO(response.content))
+	# Twitch app stuff
+	#client = twitch.TwitchClient(client_id="fh146rt2ojrmmgopnzuvplfe7v4yyh")
 
-	croppedImage = streamImage.crop(streamImageBox)
+	# Livestreamer download
+	session = livestreamer.Livestreamer()
+	session.set_option("http-query-params","client_id=fh146rt2ojrmmgopnzuvplfe7v4yyh")
+	URL = "https://api.twitch.tv/api/channels/" + streamName + "?client_id=fh146rt2ojrmmgopnzuvplfe7v4yyh"
+	#streams = session.streams(URL)
+	#stream = streams['best']
 
-	paddedImage = createPaddedImage(croppedImage, imageResize)
+	plugin = session.resolve_url("http://twitch.tv/" + streamName)
+	streams = plugin.get_streams()
+	stream = streams['best']
 
-	#TODO: figure out a way to see if you won by taking pictures of the location of the victory message
+	fd = stream.open()
+	data = fd.read(10024)
+	fd.close()
 
-	paddedImage.save(destinationFolder+saveImageName+str(i)+".png")
+	fname = 'stream.bin'
+	open(fname, 'wb').write(data)
+	capture = cv2.VideoCapture(fname)
+	imgdata = capture.read()[1]
+	imgdata = imgdata[...,::-1] # BGR -> RGB
+	img = Image.fromarray(imgdata)
+	img.save('frame.png')
+
+	# response = requests.get(URL)
+	# streamImage = Image.open(BytesIO(response.content))
+
+	# croppedImage = streamImage.crop(streamImageBox)
+
+	# paddedImage = createPaddedImage(croppedImage, imageResize)
+
+	# #TODO: figure out a way to see if you won by taking pictures of the location of the victory message
+
+	# paddedImage.save(destinationFolder+saveImageName+str(i)+".png")
 	i = i + 1
 
 	print("saved Image.")
