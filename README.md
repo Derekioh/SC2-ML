@@ -23,7 +23,6 @@ pip install shutil
 pip install PIL
 pip install pysc2
 pip install win32gui
-pip install python-twitch-client
 pip install livestreamer
 pip install opencv-python
 ```
