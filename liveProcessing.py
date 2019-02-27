@@ -4,18 +4,19 @@ from PIL import Image
 import requests
 from io import BytesIO
 import time
-#import twitch
+#import twitch #pip install python-twitch-client
 import livestreamer
 import cv2
 
 ##################################
 
 #streamName  = "esl_sc2"
-streamName  = "naniwasc2"
+streamName  = "kennystream"
 imageWidth  = 1920
 imageHeight = 1080
 URL         = "https://static-cdn.jtvnw.net/previews-ttv/live_user_" + streamName + "-" + str(imageWidth) + "x" + str(imageHeight) + ".jpg"
-streamImageBox = (27, 807, 287, 1066)
+streamImageBox = (27, 807, 287, 1066) #regular streamer
+#streamImageBox = (0,  842, 245, 1079) #ESL stream
 
 imageResize = 256
 destinationFolder = "StreamImages/" + streamName + "/"
@@ -52,62 +53,70 @@ print("Preview Stream URL")
 print(URL)
 print("------------------")
 
+# Livestreamer download
+print("Connecting to the Stream...")
+session = livestreamer.Livestreamer()
+session.set_option("http-headers","Client-ID=" + CLIENT_ID_TWITCH_WEBPLAYER)
+#URL = "https://api.twitch.tv/api/channels/" + streamName + "?client_id=" + CLIENT_ID_TWITCH_WEBPLAYER
+#streams = session.streams(URL)
+#stream = streams['best']
+
+plugin = session.resolve_url("http://twitch.tv/" + streamName)
+streams = plugin.get_streams()
+#stream = streams['best']
+stream = streams['1080p60']
+print("Connected to Stream.")
+
 i = 0
-while i < 1:
+while i < 5:
 
 	# Twitch app stuff
 	#client = twitch.TwitchClient(client_id=CLIENT_ID)
 
-	# Livestreamer download
-	print("Connecting to the Stream...")
-	session = livestreamer.Livestreamer()
-	session.set_option("http-headers","Client-ID=" + CLIENT_ID_TWITCH_WEBPLAYER)
-	#URL = "https://api.twitch.tv/api/channels/" + streamName + "?client_id=" + CLIENT_ID_TWITCH_WEBPLAYER
-	#streams = session.streams(URL)
-	#stream = streams['best']
-
-	plugin = session.resolve_url("http://twitch.tv/" + streamName)
-	streams = plugin.get_streams()
-	stream = streams['best']
-	print("Connected to Stream.")
-
 	print("Gathering Stream Data...")
 	fd = stream.open()
-	data = fd.read(10024)
+	data = fd.read(300024)
 	fd.close()
 
-	fname = 'stream.bin'
+	fname = 'stream.mp4'
 	f = open(fname, 'wb')
 	f.write(data)
 	f.close()
-	time.sleep(5)
 	print("Stream Data Gathered.")
 
 	print("Capturing Image...")
-	print("open cv before")
 	capture = cv2.VideoCapture(fname)
-	print("open cv after")
-	j = 0
+
+	frameImage = 'frame' + str(i) + '.png'
+	imageCaptured = False
 	while capture.isOpened():
 		ret, frame = capture.read()
 		if ret == True:
 			imgdata = frame[...,::-1]
 			img = Image.fromarray(imgdata)
-			img.save('StreamImages/frame' + str(j) + '.png')
+			img.save(destinationFolder+frameImage)
 			print("Image Captured and Saved.")
+			imageCaptured = True
+			break
 		else:
+			print("Imaged Failed to Captured.")
+			imageCaptured = False
 			break
 	#imgdata = capture.read()[1]
 	capture.release()
 
-	# response = requests.get(URL)
-	# streamImage = Image.open(BytesIO(response.content))
+	if imageCaptured:
+		streamImageObj = Image.open(destinationFolder+frameImage)
+		croppedImage   = streamImageObj.crop(streamImageBox)
+		streamImageObj.close()
+		paddedImage    = createPaddedImage(croppedImage, imageResize)
+		paddedImage.save(destinationFolder+"cropped"+frameImage)
 
-	# croppedImage = streamImage.crop(streamImageBox)
-
-	# paddedImage = createPaddedImage(croppedImage, imageResize)
+		# streamImage = Image.open(BytesIO(response.content))
+		# croppedImage = streamImage.crop(streamImageBox)
+		# paddedImage = createPaddedImage(croppedImage, imageResize)
+		# paddedImage.save(destinationFolder+saveImageName+str(i)+".png")
 
 	# #TODO: figure out a way to see if you won by taking pictures of the location of the victory message
 
-	# paddedImage.save(destinationFolder+saveImageName+str(i)+".png")
 	i = i + 1
