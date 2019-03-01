@@ -20,10 +20,9 @@ For more details on results
 Python 3 requirements
 ```
 pip install shutil
-pip install PIL
+pip install Pillow
 pip install pysc2
 pip install win32gui
-pip install python-twitch-client
 pip install livestreamer
 pip install opencv-python
 ```
