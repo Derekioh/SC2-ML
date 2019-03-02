@@ -552,6 +552,7 @@ def main(unused_argv):
     stats_queue.put(None)  # Tell the stats_thread to print and exit.
     stats_thread.join()
 
+    #TODO: send message when we are done processing the code
 
 
 if __name__ == "__main__":

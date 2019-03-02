@@ -5,7 +5,7 @@
 # RESIZE IMAGES WITH PADDING
 from PIL import Image, ImageOps
 
-from os import listdir
+import os
 from os.path import isfile, join
 from shutil import rmtree
 
@@ -19,10 +19,10 @@ if not(os.path.isdir(paddedImageFilePath)):
 	os.mkdir(paddedImageFilePath)
 else:
 	#delete files and create new ones
-	shutil.rmtree(paddedImageFilePath)
+	rmtree(paddedImageFilePath)
 	os.mkdir(paddedImageFilePath)
 
-imageFilesPrePadding = [f for f in listdir(prePaddedImageFilePath.strip('/')) if isfile(join(prePaddedImageFilePath.strip('/'), f))]
+imageFilesPrePadding = [f for f in os.listdir(prePaddedImageFilePath.strip('/')) if isfile(join(prePaddedImageFilePath.strip('/'), f))]
 
 for file in imageFilesPrePadding:
 
