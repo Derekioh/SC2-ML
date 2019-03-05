@@ -90,8 +90,6 @@ print("Parsing Complete.")
 #       MOVE IMAGES TO CLASS FOLDERS     #
 ##########################################
 
-from os import rename
-
 imagePath = "resizedFullVisionImages/"
 classOnePath = "resizedFullVisionImages/001/"
 classTwoPath = "resizedFullVisionImages/002/"
