@@ -1,0 +1,41 @@
+Getting replay list: C:\Users\dtlafever\Documents\GitHub\SC2-ML\BadReplay
+1 replays found.
+
+[0] Starting up a new SC2 instance.
+[0] SC2 Started successfully.
+[0] Got replay: C:\Users\dtlafever\Documents\GitHub\SC2-ML\BadReplay\11.SC2Replay
+[0] ------------------ Replay Info 11.SC2Repl ------------------
+[0] map_name: "Acid Plant LE"
+[0] player_info {
+[0]   player_info {
+[0]     player_id: 1
+[0]     race_requested: Zerg
+[0]     race_actual: Zerg
+[0]   }
+[0]   player_result {
+[0]     player_id: 1
+[0]     result: Defeat
+[0]   }
+[0]   player_apm: 456
+[0] }
+[0] player_info {
+[0]   player_info {
+[0]     player_id: 2
+[0]     race_requested: Terran
+[0]     race_actual: Terran
+[0]   }
+[0]   player_result {
+[0]     player_id: 2
+[0]     result: Victory
+[0]   }
+[0]   player_mmr: 2800
+[0]   player_apm: 365
+[0] }
+[0] game_duration_loops: 30892
+[0] game_duration_seconds: 1379.203369140625
+[0] game_version: "4.4.0.65895"
+[0] data_build: 65895
+[0] base_build: 65895
+[0] data_version: "BF41339C22AE2EDEBEEADC8C75028F7D"
+[0] ------------------------------------------------------------
+[0] Starting 11.SC2Repl from player 1's perspective

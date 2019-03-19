@@ -10,6 +10,18 @@ import cv2
 
 ##################################
 
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+import torch
+from torchvision import transforms
+import datetime as dt
+#from fastai.vision.image import open_image
+
+##################################
+
+modelPath = "Models/ResNet18_BinaryClassification_FullVision/"
+modeFileName = "model_00_0.pth"
+
 tournementStreamNames = ["esl_sc2","starcraft"]
 
 streamName  = "esl_sc2"
@@ -87,6 +99,11 @@ def inGame(streamIm, streamName, tournementStreamNames):
 
 #print("Preview Stream URL")
 #print(URL)
+
+# Load model class
+model = torch.load(modelPath+modeFileName)
+model.eval()
+
 print("------------------")
 
 # Livestreamer download
@@ -103,12 +120,24 @@ streams = plugin.get_streams()
 stream = streams['1080p60']
 print("Connected to Stream.")
 
-i = 0
-while True:
+####################################
+normalize = transforms.Normalize(
+	mean=[0.1213, 0.1105, 0.1275],
+	std=[0.1201, 0.1079, 0.1408]
+)
 
-	# Twitch app stuff
-	#client = twitch.TwitchClient(client_id=CLIENT_ID)
+preprocess = transforms.Compose([
+   transforms.ToTensor(),
+   normalize
+])
 
+# Create figure for plotting
+fig = plt.figure()
+ax = fig.add_subplot(1, 1, 1)
+xs = []
+ys = []
+
+def animate(i, stream, xs, ys):
 	print("Gathering Stream Data...")
 	fd = stream.open()
 	data = fd.read(400024)
@@ -130,20 +159,47 @@ while True:
 		#Image was captured, lets use it
 		imgdata = frame[...,::-1]
 		img = Image.fromarray(imgdata)
-		if inGame(img, streamName, tournementStreamNames):
-			#we are actually in a game, lets take the map image
-			print("IN GAME")
-			#img.save(destinationFolder+frameImage) #save the full screen image
-			croppedImage   = img.crop(streamImageBox)
-			paddedImage    = createPaddedImage(croppedImage, imageResize)
-			paddedImage.save(destinationFolder+"cropped"+frameImage)
-			i = i + 1	
-			print("Image Captured and Saved.")
-		else:
-			print("NOT GAME")
-	else:
-		print("Imaged Failed to Captured.")
-	capture.release()
-	# #TODO: figure out a way to see if you won by taking pictures of the location of the victory message
+		#if inGame(img, streamName, tournementStreamNames):
+		#we are actually in a game, lets take the map image
+		print("IN GAME")
+		#img.save(destinationFolder+frameImage) #save the full screen image
+		croppedImage   = img.crop(streamImageBox)
+		paddedImage    = createPaddedImage(croppedImage, imageResize)
 
-	
+		#paddedImage.save(destinationFolder+"cropped"+frameImage)
+		imgTensor = preprocess(paddedImage)
+		imgTensor.unsqueeze_(0)
+
+		output = model(imgTensor.cuda())
+		print("TENSOR: " + str(output))
+		print("OUTPUT: " + str(output[0][0].item()))
+
+		# Add x and y to lists
+		#xs.append(dt.datetime.now().strftime('%H:%M:%S.%f'))
+		xs.append(i)
+		ys.append((output[0][0].item()))
+
+		# Limit x and y lists to 20 items
+		xs = xs[-50:]
+		ys = ys[-50:]
+
+		# Draw x and y lists
+		ax.clear()
+		ax.plot(xs, ys)
+
+		print("Image Captured and Saved.")
+
+		#else:
+		#print("NOT GAME")
+	else:
+		print("Imaged Failed to Captured.") 
+
+
+####################################
+
+ani = animation.FuncAnimation(fig, animate, fargs=(stream, xs, ys), interval=1000)
+plt.show()
+
+
+#capture.release()
+	# #TODO: figure out a way to see if you won by taking pictures of the location of the victory message

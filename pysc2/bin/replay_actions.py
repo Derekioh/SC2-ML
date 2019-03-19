@@ -25,7 +25,10 @@ import signal
 import sys
 import threading
 import time
-from PIL import ImageGrab
+
+import mss
+import mss.tools
+#from PIL import ImageGrab
 import win32gui
 
 from absl import app
@@ -344,6 +347,21 @@ class ReplayProcessor(multiprocessing.Process):
     self.stats.update(stage)
     self.stats_queue.put(self.stats)
 
+  def captureImage(self, boundingBox, outputFile):
+    #bbox = (28, 873, 308, 1145)
+    with mss.mss() as sct:
+      # Get information of monitor 1
+      #monitor_number = 1
+      #monitor = sct.monitors[monitor_number]
+
+      im = sct.grab(boundingBox)
+
+      # Grab the data
+      sct_img = sct.grab(boundingBox)
+
+      # Save to the picture file
+      mss.tools.to_png(im.rgb, im.size, output=outputFile)
+
   def process_replay(self, controller, replay_data, map_data, player_id, totalTime, gameNUM):
     """Process a single replay, updating the stats."""
     self.stats.replay_stats.replays = 0
@@ -433,27 +451,29 @@ class ReplayProcessor(multiprocessing.Process):
           winlist.append((hwnd, win32gui.GetWindowText(hwnd)))
         try:
           toplist, winlist = [], []
-          win32gui.EnumWindows(enum_cb, toplist)
+          #win32gui.EnumWindows(enum_cb, toplist)
 
-          starcraft2Client = [(hwnd, title) for hwnd, title in winlist if 'starcraft ii' in title.lower()]
+          #starcraft2Client = [(hwnd, title) for hwnd, title in winlist if 'starcraft ii' in title.lower()]
           # just grab the hwnd for first window matching starcraft2Client
-          if len(starcraft2Client) == 0:
-            print("[ERROR] Starcraft 2 Client Not Running.")
-            writeToLog("[ERROR] Starcraft 2 Client Not Running.",self.logFileName)
-            dataFile.write(str(gameNUM) + "," + str(player_id) + "," + str(int(sec)) + "," + "ERROR\n")
-          else:
-            starcraft2Client = starcraft2Client[0]
-            hwnd = starcraft2Client[0]
+          #if len(starcraft2Client) == 0:
+            #print("[ERROR] Starcraft 2 Client Not Running.")
+            #writeToLog("[ERROR] Starcraft 2 Client Not Running.",self.logFileName)
+            #dataFile.write(str(gameNUM) + "," + str(player_id) + "," + str(int(sec)) + "," + "ERROR\n")
+          #else:
+            #starcraft2Client = starcraft2Client[0]
+            #hwnd = starcraft2Client[0]
 
-            win32gui.SetForegroundWindow(hwnd)
+            #win32gui.SetForegroundWindow(hwnd)
             #time.sleep(.1)
-            bbox = win32gui.GetWindowRect(hwnd)
-            bbox = (6,913,250,1160)
-            img = ImageGrab.grab(bbox)
-            img.save("FullVisionImages/"+imageName)
+            #bbox = win32gui.GetWindowRect(hwnd)
+            #bbox = (6,913,250,1160)
+            #bbox = (28, 873, 308, 1145)
+            #self.captureImage(bbox, "FullVisionImages2/"+imageName)
+            # img = ImageGrab.grab(bbox)
+            # img.save("FullVisionImages2/"+imageName)
 
-            dataFile.write(str(gameNUM) + "," + str(player_id) + "," + str(int(sec)) + "," + imageName + "\n")
-            dataFile.close()
+          dataFile.write(str(gameNUM) + "," + str(player_id) + "," + str(int(sec)) + "," + imageName + "\n")
+          dataFile.close()
         except:
           dataFile.write(str(gameNUM) + "," + str(player_id) + "," + str(int(sec)) + "," + "ERROR\n")
           dataFile.close()
