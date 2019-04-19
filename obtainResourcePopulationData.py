@@ -27,9 +27,11 @@ import threading
 import time
 
 import mss
+#import png
 import mss.tools
+#import numpy as np
 #from PIL import ImageGrab
-import win32gui
+#import win32gui
 
 from absl import app
 from absl import flags
@@ -56,54 +58,32 @@ flags.DEFINE_integer("parallel", 1, "How many instances to run in parallel.")
 flags.DEFINE_integer("step_mul", 8, "How many game steps per observation.")
 flags.DEFINE_string("replays", None, "Path to a directory of replays.")
 
-point_flag.DEFINE_point("rgb_screen_size", "256,192",
-                        "Resolution for rendered screen.")
-point_flag.DEFINE_point("feature_screen_size", "84",
-                        "Resolution for screen feature layers.")
-
-point_flag.DEFINE_point("rgb_minimap_size", "128",
-                        "Resolution for rendered minimap.")
-point_flag.DEFINE_point("feature_minimap_size", "64",
-                        "Resolution for minimap feature layers.")
-
 flags.DEFINE_bool("disable_fog", None,
                   "A flag for whether or not to have fog of war and render the " +
                    "game with both player perspectives.")
 
 flags.DEFINE_integer("time_interval", 5, "How many seconds to wait in between taking screenshots")
 
-# class ActionSpace(enum.Enum):
-#   FEATURES = 1
-#   RGB = 2
-flags.DEFINE_integer("action_space", 1,  # pylint: disable=protected-access
-                  "Which action space to use. Needed if you take both feature " +
-                  "and rgb observations.")
-
 flags.mark_flag_as_required("replays")
 flags.mark_flag_as_required("disable_fog")
-#flags.mark_flag_as_required("time_interval")
 
 FLAGS(sys.argv)
 
-size = point.Point(16, 16)
+size = point.Point(64, 64)
+# interface = sc_pb.InterfaceOptions(
+#     raw=False, score=False,
+#     feature_layer=sc_pb.SpatialCameraSetup(width=24))
 interface = sc_pb.InterfaceOptions(
-    raw=True, score=False,
-    feature_layer=sc_pb.SpatialCameraSetup(width=24))
-size.assign_to(interface.feature_layer.resolution)
-size.assign_to(interface.feature_layer.minimap_resolution)
+    raw=False, score=False)
+# size.assign_to(interface.feature_layer.resolution)
+# size.assign_to(interface.feature_layer.minimap_resolution)
+size.assign_to(interface.render.resolution)
+size.assign_to(interface.render.minimap_resolution)
 
 def writeToLog(msg, logFileName):
   logFile = open(logFileName,"a")
   logFile.write(msg+"\n")
   logFile.close()
-
-# FLAGS.feature_screen_size.assign_to(interface.feature_layer.resolution)
-# FLAGS.feature_minimap_size.assign_to(
-#     interface.feature_layer.minimap_resolution)
-# FLAGS.rgb_screen_size.assign_to(interface.render.resolution)
-# FLAGS.rgb_minimap_size.assign_to(interface.render.minimap_resolution)
-
-#FLAGS.action_space.assign_to(interface.render.action_space)
 
 def sorted_dict_str(d):
   return "{%s}" % ", ".join("%s: %s" % (k, d[k])
@@ -243,19 +223,20 @@ def valid_replay(info, ping, logFileName):
       writeToLog("INVALID REPLAY: player APM < 10",logFileName)
       return False
 
+
 class ReplayProcessor(multiprocessing.Process):
   """A Process that pulls replays and processes them."""
 
-  def __init__(self, proc_id, run_config, replay_queue, stats_queue, dataFileName, logFileName):
+  def __init__(self, proc_id, run_config, replay_queue, logFileName, data_queue):
     super(ReplayProcessor, self).__init__()
-    self.stats = ProcessStats(proc_id)
-    self.run_config = run_config
+    self.stats        = ProcessStats(proc_id)
+    self.run_config   = run_config
     self.replay_queue = replay_queue
-    self.stats_queue = stats_queue
-    self.dataFileName = dataFileName
-    self.logFileName = logFileName
+    self.logFileName  = logFileName
+    self.data_queue   = data_queue
 
   def run(self):
+    self.sct = mss.mss() # placed here since windows cannot fork
     signal.signal(signal.SIGTERM, lambda a, b: sys.exit())  # Exit quietly.
     self._update_stage("spawn")
     replay_name = "none"
@@ -287,17 +268,14 @@ class ReplayProcessor(multiprocessing.Process):
 
               # WRITE TO DATA FILE
               gameNUM = gameNUM + 1
-              totalTime = info.game_duration_seconds
+              totalTime = round(info.game_duration_seconds)
               if info.player_info[0].player_result.result == 2:
                 outcome = 1
               else:
                 outcome = 2
-              dataFile = open(self.dataFileName,'a')
-              dataFile.write("GAME," + str(gameNUM) + ","
-                            + str(info.player_info[0].player_info.race_actual) + "," + str(info.player_info[0].player_apm) + ","
-                            + str(info.player_info[1].player_info.race_actual) + "," + str(info.player_info[1].player_apm) + ","
-                            + str(info.map_name) + "," + str(totalTime) + "," + str(outcome) + "\n")
-              dataFile.close()
+
+              p1_race = info.player_info[0].player_info.race_actual
+              p2_race = info.player_info[1].player_info.race_actual
 
               self._print("-" * 60)
               if valid_replay(info, ping, self.logFileName):
@@ -311,15 +289,12 @@ class ReplayProcessor(multiprocessing.Process):
                   self._update_stage("open map file")
                   map_data = self.run_config.map_data(info.local_map_path)
                 
-                if FLAGS.disable_fog == False:
-                  player_id_list = [1, 2]
-                else:
-                  player_id_list = [1]
+                player_id_list = [1, 2]
                 for player_id in player_id_list:
                   self._print("Starting %s from player %s's perspective" % (
                       replay_name, player_id))
                   self.process_replay(controller, replay_data, map_data,
-                                      player_id, totalTime, gameNUM)
+                                      player_id, totalTime, gameNUM, outcome, p1_race, p2_race)
               else:
                 self._print("Replay is invalid.")
                 self.stats.replay_stats.invalid_replays.add(replay_name)
@@ -345,24 +320,8 @@ class ReplayProcessor(multiprocessing.Process):
 
   def _update_stage(self, stage):
     self.stats.update(stage)
-    self.stats_queue.put(self.stats)
 
-  def captureImage(self, boundingBox, outputFile):
-    #bbox = (28, 873, 308, 1145)
-    with mss.mss() as sct:
-      # Get information of monitor 1
-      #monitor_number = 1
-      #monitor = sct.monitors[monitor_number]
-
-      im = sct.grab(boundingBox)
-
-      # Grab the data
-      sct_img = sct.grab(boundingBox)
-
-      # Save to the picture file
-      mss.tools.to_png(im.rgb, im.size, output=outputFile)
-
-  def process_replay(self, controller, replay_data, map_data, player_id, totalTime, gameNUM):
+  def process_replay(self, controller, replay_data, map_data, player_id, totalTime, gameNUM, outcome, p1_race, p2_race):
     """Process a single replay, updating the stats."""
     self.stats.replay_stats.replays = 0
     self._update_stage("start_replay")
@@ -373,32 +332,13 @@ class ReplayProcessor(multiprocessing.Process):
         observed_player_id=player_id,
         disable_fog=FLAGS.disable_fog))
 
-    #TODO: Figure out how to properly use enums for this library
-    # if FLAGS.action_space == 1:
-    #   action_space = actions.ActionSpace.FEATURES
-    # else:
-    #   action_space = actions.ActionSpace.RGB
-
     feat = features.features_from_game_info(controller.game_info())
-#     feat = features.Features(
-#         features.AgentInterfaceFormat(
-#             feature_dimensions=features.Dimensions(
-#                 screen=FLAGS.feature_screen_size, minimap=FLAGS.feature_minimap_size),
-# #                screen=(64, 60), minimap=(32, 28)),
-#             rgb_dimensions=features.Dimensions(
-#                 screen=FLAGS.rgb_screen_size, minimap=FLAGS.rgb_minimap_size),
-# #                screen=(128, 124), minimap=(64, 60)),
-#             action_space=action_space,
-#             use_feature_units=True
-#         ),
-#         map_size=point.Point(256, 256)
-#     )
-
 
     self.stats.replay_stats.replays += 1
     self._update_stage("step")
     controller.step()
-    obsIntervals = [] #created since sometimes obs are on the same time step (ex. multiple game steps at 5 seconds)
+
+    obsIntervals = []
     while True:
       self.stats.replay_stats.steps += 1
       self._update_stage("observe")
@@ -437,81 +377,78 @@ class ReplayProcessor(multiprocessing.Process):
       if obs.player_result:
         break
 
+      #print(obs.playercommon.minerals)
+      #print(obs.observation.player_common)
+
       sec = obs.observation.game_loop // 22.4  # http://liquipedia.net/starcraft2/Game_Speed
 
-      #if self.stats.replay_stats.steps % 110 == 0: #every 5 seconds~
       if sec % FLAGS.time_interval == 0 and sec not in obsIntervals: #every 5 seconds
         obsIntervals.append(sec)
-        #print("Time: " + str(sec) + "/" + str(totalTime))
 
-        dataFile = open(self.dataFileName,'a')
-        imageName = str(gameNUM) + "_" + str(player_id) + "_" + str(int(sec)) + ".png"
+        # holds our mineral, vespene gas, and food data
+        playerData = obs.observation.player_common
 
-        def enum_cb(hwnd, results):
-          winlist.append((hwnd, win32gui.GetWindowText(hwnd)))
-        try:
-          toplist, winlist = [], []
-          win32gui.EnumWindows(enum_cb, toplist)
-
-          starcraft2Client = [(hwnd, title) for hwnd, title in winlist if 'starcraft ii' in title.lower()]
-          # just grab the hwnd for first window matching starcraft2Client
-          if len(starcraft2Client) == 0:
-            print("[ERROR] Starcraft 2 Client Not Running.")
-            writeToLog("[ERROR] Starcraft 2 Client Not Running.",self.logFileName)
-            dataFile.write(str(gameNUM) + "," + str(player_id) + "," + str(int(sec)) + "," + "ERROR\n")
-          else:
-            starcraft2Client = starcraft2Client[0]
-            hwnd = starcraft2Client[0]
-
-            win32gui.SetForegroundWindow(hwnd)
-            #time.sleep(.1)
-            #bbox = win32gui.GetWindowRect(hwnd)
-            #bbox = (6,913,250,1160)
-            bbox = (28, 873, 308, 1145)
-            self.captureImage(bbox, "FullVisionImages2/"+imageName)
-            # img = ImageGrab.grab(bbox)
-            # img.save("FullVisionImages2/"+imageName)
-
-            dataFile.write(str(gameNUM) + "," + str(player_id) + "," + str(int(sec)) + "," + imageName + "\n")
-            dataFile.close()
-        except:
-          dataFile.write(str(gameNUM) + "," + str(player_id) + "," + str(int(sec)) + "," + "ERROR\n")
-          dataFile.close()
+        self.data_queue.put((gameNUM, totalTime, int(sec), outcome, p1_race, p2_race, playerData))
 
       self._update_stage("step")
       controller.step(FLAGS.step_mul)
 
+def dataCapture(data_queue, dataFileName):
+  dataFile = open(dataFileName,'w')
 
-def stats_printer(stats_queue):
-  """A thread that consumes stats_queue and prints them every 10 seconds."""
-  proc_stats = [ProcessStats(i) for i in range(FLAGS.parallel)]
-  print_time = start_time = time.time()
-  width = 107
+  #TODO: deal with having only one player perspective at a time! Might need two files
+  dataFile.write("ReplayID,TotalTime,currentTime,p1_race,p1_minerals,p1_gas,p1_foodUsed,p1_foodCap,p2_race,p2_minerals,p2_gas,p2_foodUsed,p2_foodCap,Outcome\n")
+
+  replayData = {}
+  replayID = -1
+  replayTotalTime = -1
+  replayOutcome = -1
+  replayP1Race = -1
+  replayP2Race = -1
 
   running = True
   while running:
-    print_time += 1
+    try:
+      element = data_queue.get()
+      if element == None:  # Signal to print and exit NOW!
+        for key in replayData:
+          line = str(replayID) + "," + str(replayTotalTime) + "," + replayData[key] + "\n"
+          dataFile.write(line)
+        running = False
+        break
+      
+      gameID, totalTime, curTime, outcome, p1_race, p2_race, playerData = element
+      if replayID == -1:
+        replayID = gameID
+        replayTotalTime = totalTime
+        replayOutcome = outcome
+        replayP1Race = p1_race
+        replayP2Race = p2_race
+      elif replayID != gameID:
+        # We have reached a new replay, write to file and start new replayData
+        for key in replayData:
+          line = str(replayID) + "," + str(replayTotalTime) + "," + replayData[key] + "\n"
+          dataFile.write(line)
 
-    while time.time() < print_time:
-      try:
-        s = stats_queue.get(True, print_time - time.time())
-        if s is None:  # Signal to print and exit NOW!
-          running = False
-          break
-        proc_stats[s.proc_id] = s
-      except queue.Empty:
-        pass
+        replayID = gameID
+        replayTotalTime = totalTime
+        replayOutcome = outcome
+        replayP1Race = p1_race
+        replayP2Race = p2_race
+        replayData = {}
 
-    replay_stats = ReplayStats()
-    for s in proc_stats:
-      replay_stats.merge(s.replay_stats)
+      #keep gathering data!
+      if playerData.player_id == 1:
+        line = str(curTime) + "," + str(replayP1Race) + "," + str(playerData.minerals) + "," + str(playerData.vespene) + "," + str(playerData.food_used) + "," + str(playerData.food_cap) + ","
+        replayData[curTime] = line
+      elif playerData.player_id == 2:
+        line = str(replayP2Race) + "," + str(playerData.minerals) + "," + str(playerData.vespene) + "," + str(playerData.food_used) + "," + str(playerData.food_cap) + "," + str(replayOutcome)
+        replayData[curTime] += line
 
-    # print((" Summary %0d secs " % (print_time - start_time)).center(width, "="))
-    # print(replay_stats)
-    # print(" Process stats ".center(width, "-"))
-    # print("\n".join(str(s) for s in proc_stats))
-    # print("=" * width)
+    except Exception as e: #Empty queue
+      pass
 
+  dataFile.close()
 
 def replay_queue_filler(replay_queue, replay_list):
   """A thread that fills the replay_queue with replay filenames."""
@@ -527,8 +464,8 @@ def main(unused_argv):
     sys.exit("{} doesn't exist.".format(FLAGS.replays))
 
   #dataFile = open('data.txt','a')
-  dataFileName = "dataFullVision.txt"
-  logFileName = "log.txt"
+  dataFileName = "data.csv"
+  logFileName = "log_RP.txt"
 
   if os.path.exists(dataFileName):
     os.remove(dataFileName)
@@ -536,9 +473,9 @@ def main(unused_argv):
   if os.path.exists(logFileName):
     os.remove(logFileName)
 
-  stats_queue = multiprocessing.Queue()
-  stats_thread = threading.Thread(target=stats_printer, args=(stats_queue,))
-  stats_thread.start()
+  data_queue = multiprocessing.Queue()
+  data_thread = threading.Thread(target=dataCapture, args=(data_queue,dataFileName))
+  data_thread.start()
   try:
     # For some reason buffering everything into a JoinableQueue makes the
     # program not exit, so save it into a list then slowly fill it into the
@@ -559,7 +496,7 @@ def main(unused_argv):
     replay_queue_thread.start()
 
     for i in range(FLAGS.parallel):
-      p = ReplayProcessor(i, run_config, replay_queue, stats_queue, dataFileName, logFileName)
+      p = ReplayProcessor(i, run_config, replay_queue, logFileName, data_queue)
       p.daemon = True
       p.start()
       time.sleep(1)  # Stagger startups, otherwise they seem to conflict somehow
@@ -569,8 +506,8 @@ def main(unused_argv):
     print("Caught KeyboardInterrupt, exiting.")
     writeToLog("Caught KeyboardInterrupt, exiting.",logFileName)
   finally:
-    stats_queue.put(None)  # Tell the stats_thread to print and exit.
-    stats_thread.join()
+    data_queue.put(None) # Tell the data_queue to exit.
+    data_thread.join()
 
     #TODO: send message when we are done processing the code
 

@@ -1,28 +1,29 @@
+from PIL import Image, ImageOps
+
+import os
+from os.path import isfile, join
+from shutil import rmtree
+from shutil import copyfile
+import math
+
 ##########################################
 #       RESIZE IMAGES WITH PADDING       #
 ##########################################
 
-# RESIZE IMAGES WITH PADDING
-from PIL import Image, ImageOps
-
-from os import listdir
-from os.path import isfile, join
-from shutil import rmtree
-
 print("Resizing images to be the correct size with padding...")
 
 desiredImageSize = 256
-prePaddedImageFilePath = "Images/"
-paddedImageFilePath = "resizedImages/"
+prePaddedImageFilePath = "FullVisionImages/"
+paddedImageFilePath = "resizedFullVisionImages/"
 
 if not(os.path.isdir(paddedImageFilePath)):
-	os.mkdir(paddedImageFilePath)
+	os.mkdir(paddedImageFilePath.strip("/"))
 else:
 	#delete files and create new ones
-	shutil.rmtree(paddedImageFilePath)
-	os.mkdir(paddedImageFilePath)
+	rmtree(paddedImageFilePath)
+	os.mkdir(paddedImageFilePath.strip("/"))
 
-imageFilesPrePadding = [f for f in listdir(prePaddedImageFilePath.strip('/')) if isfile(join(prePaddedImageFilePath.strip('/'), f))]
+imageFilesPrePadding = [f for f in os.listdir(prePaddedImageFilePath.strip('/')) if isfile(join(prePaddedImageFilePath.strip('/'), f))]
 
 for file in imageFilesPrePadding:
 
@@ -51,8 +52,6 @@ print("Resizing complete.")
 ##########################################
 #       PARSE DATA AND CREATE A CSV      #
 ##########################################
-
-import math
 
 print("Parsing data file and creating a CSV from it...")
 
@@ -90,25 +89,34 @@ print("Parsing Complete.")
 #       MOVE IMAGES TO CLASS FOLDERS     #
 ##########################################
 
-from os import rename
+# Time when it is undetermined who will win
+DRAW_TIME = 60
 
-imagePath = paddedImageFilePath
-classOnePath = paddedImageFilePath + "001/"
-classTwoPath = paddedImageFilePath + "002/"
+imagePath = "resizedFullVisionImages/"
+classZeroPath = imagePath + "000/"
+classOnePath  = imagePath + "001/"
+classTwoPath  = imagePath + "002/"
+
+if not(os.path.isdir(classZeroPath)):
+	os.mkdir(classZeroPath.strip("/"))
+else:
+	#delete files and create new ones
+	shutil.rmtree(classZeroPath)
+	os.mkdir(classZeroPath.strip("/"))
 
 if not(os.path.isdir(classOnePath)):
-	os.mkdir(classOnePath)
+	os.mkdir(classOnePath.strip("/"))
 else:
 	#delete files and create new ones
 	shutil.rmtree(classOnePath)
-	os.mkdir(classOnePath)
+	os.mkdir(classOnePath.strip("/"))
 
 if not(os.path.isdir(classTwoPath)):
-	os.mkdir(classTwoPath)
+	os.mkdir(classTwoPath.strip("/"))
 else:
 	#delete files and create new ones
 	shutil.rmtree(classTwoPath)
-	os.mkdir(classTwoPath)
+	os.mkdir(classTwoPath.strip("/"))
 
 datasetFile = "datasetFullVision.csv"
 
@@ -117,43 +125,56 @@ dataFile = open(datasetFile,"r")
 lines = dataFile.readlines()
 dataFile.close()
 
-for line in lines:
+for line in lines[1:]:
 	stripLine = line.strip("\n").split(",")
 	#file index 0
 	#outcome 8
+	#current_time 1
 
-	if stripLine[8] == "1":
+	# if below 60 seconds, consider the game a draw
+	#print(stripLine)
+	if int(stripLine[1]) <= DRAW_TIME:
 		if os.path.isfile(imagePath + stripLine[0]):
-			os.rename(imagePath + stripLine[0], classOnePath + stripLine[0])
+				os.rename(imagePath + stripLine[0], classZeroPath + stripLine[0])
 	else:
-		if os.path.isfile(imagePath + stripLine[0]):
-			os.rename(imagePath + stripLine[0], classTwoPath + stripLine[0])
+		if stripLine[8] == "1":
+			if os.path.isfile(imagePath + stripLine[0]):
+				os.rename(imagePath + stripLine[0], classOnePath + stripLine[0])
+		else:
+			if os.path.isfile(imagePath + stripLine[0]):
+				os.rename(imagePath + stripLine[0], classTwoPath + stripLine[0])
 
 ##########################################
 #       COPY LAST 30 SEC IMAGES to FOLDER#
 ##########################################
 
-from shutil import copyfile
-
-imagePath = paddedImageFilePath
-classOnePath = paddedImageFilePath + "001/"
-classTwoPath = paddedImageFilePath + "002/"
+imagePath = "resizedFullVisionImages/"
+classZeroPath = imagePath + "000/"
+classOnePath  = imagePath + "001/"
+classTwoPath  = imagePath + "002/"
 
 LastPath = "Last/"
 
+if not(os.path.isdir(classZeroPath+LastPath)):
+	os.mkdir(classZeroPath+LastPath.strip("/"))
+else:
+	#delete files and create new ones
+	shutil.rmtree(classZeroPath+LastPath)
+	os.mkdir(classZeroPath+LastPath.strip("/"))
+
 if not(os.path.isdir(classOnePath+LastPath)):
-	os.mkdir(classOnePath+LastPath)
+	os.mkdir(classOnePath+LastPath.strip("/"))
 else:
 	#delete files and create new ones
 	shutil.rmtree(classOnePath+LastPath)
-	os.mkdir(classOnePath+LastPath)
+	os.mkdir(classOnePath+LastPath.strip("/"))
 
 if not(os.path.isdir(classTwoPath+LastPath)):
-	os.mkdir(classTwoPath+LastPath)
+	os.mkdir(classTwoPath+LastPath.strip("/"))
 else:
 	#delete files and create new ones
 	shutil.rmtree(classTwoPath+LastPath)
-	os.mkdir(classTwoPath+LastPath)
+	os.mkdir(classTwoPath+LastPath.strip("/"))
 
 datasetFile = "datasetFullVision.csv"
 

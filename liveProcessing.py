@@ -12,23 +12,42 @@ import cv2
 
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+import numpy as np
 import torch
+import os
+import sys
 from torchvision import transforms
 import datetime as dt
+from absl import flags
 #from fastai.vision.image import open_image
 
 ##################################
 
-modelPath = "Models/ResNet18_BinaryClassification_FullVision/"
-modeFileName = "model_00_0.pth"
+FLAGS = flags.FLAGS
+flags.DEFINE_string("stream", None, "The Twitch stream to observe. I.E. \"esl_sc2\"")
+flags.DEFINE_string("model", None, "The PyTorch model to use.")
+flags.DEFINE_bool("save_images", False, "Whether to save the stream map images or not.")
+
+flags.mark_flag_as_required("stream")
+flags.mark_flag_as_required("model")
+
+FLAGS(sys.argv)
+
+##################################
+
+#modelPath = "Models/ResNet18_BinaryClassification_FullVision/"
+#modeFileName = "model_00_0.pth"
+modelPath = FLAGS.model
 
 tournementStreamNames = ["esl_sc2","starcraft"]
 
-streamName  = "esl_sc2"
+#streamName  = "esl_sc2"
 #streamName  = "kennystream"
+streamName = FLAGS.stream
+
 imageWidth  = 1920
 imageHeight = 1080
-#URL         = "https://static-cdn.jtvnw.net/previews-ttv/live_user_" + streamName + "-" + str(imageWidth) + "x" + str(imageHeight) + ".jpg"
+
 if streamName in tournementStreamNames:
 	streamImageBox = (0,  842, 245, 1079) #ESL stream
 else:
@@ -36,7 +55,12 @@ else:
 	streamImageBox = (27, 807, 287, 1066) #regular streamer
 
 imageResize = 256
+
 destinationFolder = "StreamImages/" + streamName + "/"
+if not(os.path.isdir("StreamImages/")):
+	os.mkdir("StreamImages")
+if not(os.path.isdir("StreamImages/" + streamName + "/")):
+	os.mkdir("StreamImages/" + streamName)
 
 CLIENT_ID_TWITCH_WEBPLAYER = "jzkbprff40iqj646a697cyrvl0zt2m6"
 
@@ -95,13 +119,40 @@ def inGame(streamIm, streamName, tournementStreamNames):
 
 	return in_game
 
+def live_plotter(x_vec,y1_data,lines,pause_time=0.1):
+    if lines==[]:
+    	# this is the call to matplotlib that allows dynamic plotting
+        plt.ion()
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.set_ylim(-3,3)
+        # create a variable for the line so we can later update it
+        lines, = ax.plot(x_vec,y1_data,alpha=0.8)        
+        #update plot label/title
+        plt.ylabel('Prediction')
+        plt.xlabel('Time')
+        plt.title('Outcome Prediction Over time')
+        plt.show()
+    
+    # after the figure, axis, and line are created, we only need to update the y-data
+    lines.set_ydata(y1_data)
+    # adjust limits if new data goes beyond bounds
+    if np.min(y1_data)<=lines.axes.get_ylim()[0] or np.max(y1_data)>=lines.axes.get_ylim()[1]:
+        plt.ylim([np.min(y1_data)-np.std(y1_data),np.max(y1_data)+np.std(y1_data)])
+    # this pauses the data so the figure/axis can catch up - the amount of pause can be altered above
+    plt.pause(pause_time)
+    
+    # return line so we can update it again in the next iteration
+    return lines
+
 ##################################
 
 #print("Preview Stream URL")
 #print(URL)
 
 # Load model class
-model = torch.load(modelPath+modeFileName)
+#model = torch.load(modelPath+modeFileName)
+model = torch.load(modelPath)
 model.eval()
 
 print("------------------")
@@ -132,13 +183,15 @@ preprocess = transforms.Compose([
 ])
 
 # Create figure for plotting
-fig = plt.figure()
-ax = fig.add_subplot(1, 1, 1)
-xs = []
-ys = []
+plt.style.use('ggplot')
+size = 50
+xs = np.linspace(0,1,size+1)[0:-1]
+ys = np.linspace(0,0,size+1)[0:-1]
+lines = []
 
-def animate(i, stream, xs, ys):
-	print("Gathering Stream Data...")
+i = 0
+while True:
+	#print("Gathering Stream Data...")
 	fd = stream.open()
 	data = fd.read(400024)
 	fd.close()
@@ -147,9 +200,9 @@ def animate(i, stream, xs, ys):
 	f = open(fname, 'wb')
 	f.write(data)
 	f.close()
-	print("Stream Data Gathered.")
+	#print("Stream Data Gathered.")
 
-	print("Capturing Image...")
+	#print("Capturing Image...")
 	capture = cv2.VideoCapture(fname)
 
 	frameImage = 'frame' + str(i) + '.png'
@@ -166,7 +219,8 @@ def animate(i, stream, xs, ys):
 		croppedImage   = img.crop(streamImageBox)
 		paddedImage    = createPaddedImage(croppedImage, imageResize)
 
-		#paddedImage.save(destinationFolder+"cropped"+frameImage)
+		if FLAGS.save_images == True:
+			paddedImage.save(destinationFolder+"resized"+frameImage)
 		imgTensor = preprocess(paddedImage)
 		imgTensor.unsqueeze_(0)
 
@@ -176,28 +230,42 @@ def animate(i, stream, xs, ys):
 
 		# Add x and y to lists
 		#xs.append(dt.datetime.now().strftime('%H:%M:%S.%f'))
-		xs.append(i)
-		ys.append((output[0][0].item()))
+		team1WinPred = output[0][0].item()
+		team2WinPred = output[0][1].item()
+		value = 0
+		if team2WinPred > team1WinPred:
+			# TODO: decide if this subtraction is needed. The 
+			# Thought behind it is if both are equally likely 
+			# to be true, it should be a draw.
+			value = -1 * (team2WinPred - team1WinPred)
+		else:
+			value = (team1WinPred - team2WinPred)
+		#xs = np.append(xs,i)
+		ys = np.append(ys,value)
 
-		# Limit x and y lists to 20 items
-		xs = xs[-50:]
+		# Limit x and y lists to the last 50 elements
+		#xs = xs[-50:]
 		ys = ys[-50:]
 
-		# Draw x and y lists
-		ax.clear()
-		ax.plot(xs, ys)
+		lines = live_plotter(xs,ys,lines)
 
-		print("Image Captured and Saved.")
+		# if value < 0:
+		# 	newsegm, = ax.plot(xs, ys, color='red')
+		# else:
+		# 	newsegm, = ax.plot(xs, ys, color='blue')
 
 		#else:
 		#print("NOT GAME")
 	else:
 		print("Imaged Failed to Captured.") 
 
+	i += 1
+
 
 ####################################
 
-ani = animation.FuncAnimation(fig, animate, fargs=(stream, xs, ys), interval=1000)
+#ani = animation.FuncAnimation(fig, animate, frames=50, fargs=(stream, xs, ys), interval=1000)
+ani = animation.FuncAnimation(fig, animate, frames=50, interval=1000)
 plt.show()
 
 
