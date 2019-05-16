@@ -39,7 +39,11 @@ pip install absl-py
 pip install Pillow
 pip install livestreamer
 pip install opencv-python
-pip install pytesseract
+pip install pytesseract (version 3.X, NOT 4.X due to a bug in tesseract)
+<!-- pip install oauthlib -->
+pip install joblib
+pip install scikit-image
+pip install sklearn
 PyTorch 0.4.1
 ```
 

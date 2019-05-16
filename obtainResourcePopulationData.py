@@ -57,6 +57,8 @@ FLAGS = flags.FLAGS
 flags.DEFINE_integer("parallel", 1, "How many instances to run in parallel.")
 flags.DEFINE_integer("step_mul", 8, "How many game steps per observation.")
 flags.DEFINE_string("replays", None, "Path to a directory of replays.")
+flags.DEFINE_string("csv","data.csv","name of csv file to generate.")
+flags.DEFINE_string("version",None,"version number of the replays.")
 
 flags.DEFINE_bool("disable_fog", None,
                   "A flag for whether or not to have fog of war and render the " +
@@ -66,6 +68,7 @@ flags.DEFINE_integer("time_interval", 5, "How many seconds to wait in between ta
 
 flags.mark_flag_as_required("replays")
 flags.mark_flag_as_required("disable_fog")
+flags.mark_flag_as_required("version")
 
 FLAGS(sys.argv)
 
@@ -245,7 +248,7 @@ class ReplayProcessor(multiprocessing.Process):
       self._print("Starting up a new SC2 instance.")
       self._update_stage("launch")
       try:
-        with self.run_config.start("4.4.0") as controller:
+        with self.run_config.start(FLAGS.version) as controller:
           self._print("SC2 Started successfully.")
           ping = controller.ping()
           for _ in range(300):
@@ -397,7 +400,7 @@ def dataCapture(data_queue, dataFileName):
   dataFile = open(dataFileName,'w')
 
   #TODO: deal with having only one player perspective at a time! Might need two files
-  dataFile.write("ReplayID,TotalTime,currentTime,p1_race,p1_minerals,p1_gas,p1_foodUsed,p1_foodCap,p2_race,p2_minerals,p2_gas,p2_foodUsed,p2_foodCap,Outcome\n")
+  dataFile.write("ReplayID,TotalTime,currentTime,p1_race,p1_minerals,p1_gas,p1_foodUsed,p1_foodCap,p1_foodArmy,p1_foodWorkers,p2_race,p2_minerals,p2_gas,p2_foodUsed,p2_foodCap,p2_foodArmy,p2_foodWorkers,Outcome\n")
 
   replayData = {}
   replayID = -1
@@ -439,10 +442,10 @@ def dataCapture(data_queue, dataFileName):
 
       #keep gathering data!
       if playerData.player_id == 1:
-        line = str(curTime) + "," + str(replayP1Race) + "," + str(playerData.minerals) + "," + str(playerData.vespene) + "," + str(playerData.food_used) + "," + str(playerData.food_cap) + ","
+        line = str(curTime) + "," + str(replayP1Race) + "," + str(playerData.minerals) + "," + str(playerData.vespene) + "," + str(playerData.food_used) + "," + str(playerData.food_cap) + "," + str(playerData.food_army) + "," + str(playerData.food_workers) + ","
         replayData[curTime] = line
       elif playerData.player_id == 2:
-        line = str(replayP2Race) + "," + str(playerData.minerals) + "," + str(playerData.vespene) + "," + str(playerData.food_used) + "," + str(playerData.food_cap) + "," + str(replayOutcome)
+        line = str(replayP2Race) + "," + str(playerData.minerals) + "," + str(playerData.vespene) + "," + str(playerData.food_used) + "," + str(playerData.food_cap)  + "," + str(playerData.food_army) + "," + str(playerData.food_workers) + "," + str(replayOutcome)
         replayData[curTime] += line
 
     except Exception as e: #Empty queue
@@ -464,8 +467,8 @@ def main(unused_argv):
     sys.exit("{} doesn't exist.".format(FLAGS.replays))
 
   #dataFile = open('data.txt','a')
-  dataFileName = "data.csv"
-  logFileName = "log_RP.txt"
+  dataFileName = FLAGS.csv
+  logFileName = "log_" + FLAGS.csv.strip(".csv") + ".txt"
 
   if os.path.exists(dataFileName):
     os.remove(dataFileName)

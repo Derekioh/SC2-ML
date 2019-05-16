@@ -4,6 +4,12 @@ python obtainMinimapData.py --replays "C:\Users\dtlafever\Documents\GitHub\SC2-M
 
 python obtainMinimapData.py --replays "C:/Users/dtlafever/Documents/GitHub/SC2-ML/Games" --disable_fog True
 
+python obtainResourcePopulationData.py --replays "C:/Users/dtlafever/Documents/GitHub/SC2-ML/Games_Valencia" --disable_fog True --csv "data_Valencia.csv" --version "4.4.0"
+
+python obtainResourcePopulationData.py --replays "C:/Users/dtlafever/Documents/GitHub/SC2-ML/Games_Montreal" --disable_fog True --csv "data_Valencia.csv" --version "4.6.0"
+
+python obtainResourcePopulationData.py --replays "C:/Users/dtlafever/Documents/GitHub/SC2-ML/Games_Austin" --disable_fog True --csv "data_Austin.csv" --version "4.3.2"
+
 ------------------------------------------------------------------------------------
 
 python Preprocessing_main.py
@@ -12,6 +18,9 @@ python Preprocessing_main.py
 
 python liveProcessing.py --stream "esl_sc2" --model "Models/ResNet18_BinaryClassification_FullVision/model_00_0.pth"
 
+python liveProcessing.py --stream "esl_sc2" --model "Models/NonMap_Classifier/model.joblib"
+
+python liveProcessing.py --stream "videos/422744061?t=06h50m58s" --model "Models/NonMap_Classifier/model.joblib"
 
 FOR YOUR PREDICTION, START WITH LOSS OF
 0 FOR WIN
