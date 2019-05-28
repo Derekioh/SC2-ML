@@ -25,13 +25,14 @@ def main(unused_args):
 	interface = sc_pb.InterfaceOptions()
 	interface.raw = False
 	interface.score = False
-	interface.feature_layer.width = 24
+	# interface.feature_layer.width = 24
 	# FLAGS.feature_screen_size.assign_to(interface.feature_layer.resolution)
 	# FLAGS.feature_minimap_size.assign_to(interface.feature_layer.minimap_resolution)
 	# FLAGS.rgb_screen_size.assign_to(interface.render.resolution)
 	# FLAGS.rgb_minimap_size.assign_to(interface.render.minimap_resolution)
 
-	join = sc_pb.RequestJoinGame(observed_player_id=1,server_ports=sc_pb.PortSet(game_port=1119,base_port=1119),options=interface)
+	# Starcraft 2 offical ports: 	1119, 6113, 1120, 80, 3724
+	join = sc_pb.RequestJoinGame(observed_player_id=1,server_ports=sc_pb.PortSet(game_port=1119,base_port=1119),client_ports=[sc_pb.PortSet(game_port=1119,base_port=1119),sc_pb.PortSet(game_port=6113,base_port=6113),sc_pb.PortSet(game_port=1120,base_port=1120),sc_pb.PortSet(game_port=80,base_port=80),sc_pb.PortSet(game_port=3724,base_port=3724)],options=interface)
 	#join = sc_pb.RequestJoinGame(observed_player_id=1,options=interface)
 
 	try:
@@ -40,6 +41,13 @@ def main(unused_args):
 			ping = controller.ping()
 			print(ping)
 			controller.join_game(join)
+
+			obs = controller.observe()
+			# holds our mineral, vespene gas, and food data
+			playerData = obs.observation.player_common
+
+			print("Player Data")
+			print(playerData)
 
 	except (protocol.ConnectionError, protocol.ProtocolError,
 	      remote_controller.RequestError) as e:
